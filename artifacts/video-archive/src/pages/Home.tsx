@@ -105,37 +105,47 @@ export default function Home() {
 
   return (
     <Layout>
-      {/* Hero */}
-      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden section-accent">
-        <div className="container mx-auto max-w-4xl text-center relative">
-          <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-            <div className="h-px flex-1 bg-border/50" />
-            <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              Public Adult Recording Archive
-            </span>
-            <div className="h-px flex-1 bg-border/50" />
-          </div>
-
-          <h1 className="text-[clamp(3.5rem,9vw,7rem)] font-black tracking-tighter leading-none mb-6 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-            VAULT<span className="text-primary">.</span>
-            <span className="sr-only"> — Adult Cam Recording Archive &amp; Performer Directory</span>
+      {/* Compact archive hero — inspired by StripHub's simple title-first layout */}
+      <section className="relative border-b border-border/50 px-4 sm:px-6 py-6 sm:py-7 overflow-hidden section-accent">
+        <div className="container mx-auto max-w-3xl text-center relative">
+          <h1
+            className="text-[clamp(2.5rem,6vw,3.75rem)] font-extrabold tracking-[-0.055em] leading-none animate-fade-in-up"
+            style={{ animationDelay: "0ms" }}
+          >
+            CHUGLII<span className="text-primary">.</span>
+            <span className="sr-only"> — The Cam Archive</span>
           </h1>
 
-          <div className="mb-10 text-xs text-muted-foreground animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-            <p className="text-[15px] text-muted-foreground/60 font-light italic tracking-wide">
-              Browse the adult cam recording archive by performer, title, or topic.
+          <div
+            className="mt-2 flex items-center justify-center gap-3 animate-fade-in-up"
+            style={{ animationDelay: "60ms" }}
+          >
+            <span className="h-px w-8 sm:w-12 bg-border/70" aria-hidden="true" />
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.26em] font-semibold text-muted-foreground">
+              The Cam Archive
             </p>
-            <p className="mt-3 max-w-2xl mx-auto text-sm text-muted-foreground/60 font-light leading-relaxed">
-              Explore public recording listings, discover performer profiles, and sign in to save favorites to your private archive.
-            </p>
+            <span className="h-px w-8 sm:w-12 bg-border/70" aria-hidden="true" />
           </div>
 
-          <form onSubmit={handleSearch} role="search" aria-label="Search the recording archive" className="max-w-xl mx-auto relative animate-fade-in-up" style={{ animationDelay: '240ms' }}>
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+          <p
+            className="mt-2 text-xs sm:text-sm text-muted-foreground/75 animate-fade-in-up"
+            style={{ animationDelay: "120ms" }}
+          >
+            Explore recordings and performer profiles.
+          </p>
+
+          <form
+            onSubmit={handleSearch}
+            role="search"
+            aria-label="Search the recording archive"
+            className="relative max-w-lg mx-auto mt-4 animate-fade-in-up"
+            style={{ animationDelay: "180ms" }}
+          >
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
             <input
               type="text"
-              placeholder="Search by performer, title, or tag…"
-              className="w-full h-12 bg-background dark:bg-card border border-border/60 hover:border-border focus:border-primary/60 rounded-xl pl-11 pr-28 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/10 focus:border-primary/50"
+              placeholder="Search performers, recordings, or tags…"
+              className="w-full h-10 bg-background/80 dark:bg-card/80 border border-border/60 hover:border-border focus:border-primary/60 rounded-lg pl-10 pr-24 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/10 focus:border-primary/50"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search recordings"
@@ -143,11 +153,25 @@ export default function Home() {
             <button
               type="submit"
               aria-label="Search archive"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 border border-primary/30 text-primary text-xs font-semibold tracking-wide hover:border-primary/60 transition-all duration-200 rounded-lg"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-3 border border-primary/30 text-primary text-xs font-semibold hover:border-primary/60 transition-colors rounded-md"
             >
               Search
             </button>
           </form>
+
+          <nav
+            aria-label="Archive shortcuts"
+            className="mt-2.5 flex items-center justify-center gap-3 text-[11px] animate-fade-in-up"
+            style={{ animationDelay: "240ms" }}
+          >
+            <Link href="/browse" className="text-primary font-semibold hover:text-primary/80 transition-colors">
+              Latest
+            </Link>
+            <span className="text-muted-foreground/40" aria-hidden="true">·</span>
+            <Link href="/random" className="text-muted-foreground hover:text-foreground transition-colors">
+              Random
+            </Link>
+          </nav>
         </div>
       </section>
 
