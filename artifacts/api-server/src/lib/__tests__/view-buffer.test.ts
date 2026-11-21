@@ -15,6 +15,7 @@ const pg = vi.hoisted(() => ({
   meta: new Map<string, any>(), // recordings_with_links shape
   blockCas: false,
   failRead: false,
+  readCount: 0,
 }));
 
 vi.mock("../redis.js", () => ({
@@ -50,6 +51,7 @@ vi.mock("../supabase.js", () => {
       updateObj: null as any,
     };
     const readSingle = () => {
+      pg.readCount += 1;
       if (state.table === "recordings") {
         if (pg.failRead) return { data: null, error: { message: "temporary read failure" } };
         const id = findEq(state.eqs, "id");
@@ -108,6 +110,7 @@ beforeEach(() => {
   pg.meta.clear();
   pg.blockCas = false;
   pg.failRead = false;
+  pg.readCount = 0;
   vi.clearAllMocks();
   useRedis();
 });
@@ -138,6 +141,7 @@ describe("recordView", () => {
     expect(store.strings.get("views:base:v1:rec1")).toBe("100");
     expect([...store.zsets.keys()]).toContain("views:changed:v1");
     expect(pg.viewers.get("rec1")).toBe(100); // PG untouched until flush
+    expect(pg.readCount).toBe(1); // PG read only once to initialize Redis anchor
   });
 
   it("auto-flushes once the backlog crosses the threshold", async () => {
