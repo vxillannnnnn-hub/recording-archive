@@ -69,6 +69,7 @@
 /* LIGHT MODE */
 :root {
   color-scheme: light;
+  --background-pattern-dot: rgba(0, 0, 0, 0.035);
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8%;
@@ -147,6 +148,7 @@
 /* DARK MODE â€” VAULT default */
 .dark {
   color-scheme: dark;
+  --background-pattern-dot: rgba(255, 255, 255, 0.035);
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 9%;
@@ -222,6 +224,13 @@
 
   body {
     @apply font-sans antialiased text-foreground bg-background;
+    background-image:
+      radial-gradient(circle, var(--background-pattern-dot) 0.7px, transparent 0.85px),
+      radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.045), transparent 68%);
+    background-size: 28px 28px, 100% 640px;
+    background-position: 0 0, center top;
+    background-repeat: repeat, no-repeat;
+    background-attachment: scroll;
   }
 
   html {
@@ -360,24 +369,8 @@
 
 
 
-  /* Diamond lattice background pattern */
-  .pattern-square {
-    background:
-      repeating-linear-gradient(
-        45deg,
-        transparent 0 12px,
-        #100f0f 12px 16px,
-        transparent 16px 32px
-      ),
-      repeating-linear-gradient(
-        -45deg,
-        transparent 0 12px,
-        #100f0f 12px 16px,
-        transparent 16px 32px
-      ),
-      #1e1e1e;
-    background-size: 64px 64px;
-  }
+  /* Background pattern is applied to the document itself so it scrolls
+     naturally with the content instead of floating in a fixed viewport layer. */
   .nav-underline {
     position: relative;
     transition: color 0.2s ease;
