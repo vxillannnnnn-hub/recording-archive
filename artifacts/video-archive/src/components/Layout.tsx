@@ -11,6 +11,7 @@ import { markAgeGatePassed } from "@/lib/gating";
 import { PremiumUpsellPopup } from "@/components/ads/PremiumUpsellPopup";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { useTheme } from "@/contexts/ThemeContext";
+import { getGetStatsQueryKey, useGetStats } from "@workspace/api-client-react";
 
 // Lazy-load components that are heavy or only needed on interaction:
 // - NotificationBell: pulls in notification hooks, only visible for auth users
@@ -61,10 +62,44 @@ function RandomButton() {
   );
 }
 
+function formatRelativeArchiveTime(value: string | null | undefined, now: Date): string | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+
+  const differenceMs = Math.max(0, now.getTime() - timestamp);
+  if (differenceMs < 60_000) return "just now";
+  const minutes = Math.floor(differenceMs / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: days >= 365 ? "numeric" : undefined,
+  });
+}
+
 export function AgeGate() {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
+
+  // Read actual archive totals from the same stats endpoint used by the homepage.
+  // Refresh while the gate is visible; the API is cached briefly server-side.
+  const statsQuery = useGetStats({
+    query: {
+      queryKey: getGetStatsQueryKey(),
+      enabled: isOpen,
+      staleTime: 30_000,
+      refetchInterval: 60_000,
+      refetchIntervalInBackground: true,
+    },
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -76,7 +111,29 @@ export function AgeGate() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = window.setInterval(() => setClock(new Date()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [isOpen]);
+
   if (!mounted || !isOpen) return null;
+
+  const stats = statsQuery.data;
+  const formattedCount = (value: number | undefined) =>
+    typeof value === "number" ? new Intl.NumberFormat().format(value) : "—";
+  const newestRecording = formatRelativeArchiveTime(stats?.newest_recording, clock);
+  const localTime = clock.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const statsUpdatedAt = statsQuery.dataUpdatedAt
+    ? new Date(statsQuery.dataUpdatedAt).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <DialogPrimitive.Root
@@ -87,9 +144,9 @@ export function AgeGate() {
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/98 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className={`fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] ${showTerms ? "max-w-lg" : "max-w-sm"} max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card border border-border/70 shadow-2xl rounded-2xl px-8 py-10 ${showTerms ? "" : "text-center"}`}
+          className={`fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] ${showTerms ? "max-w-lg" : "max-w-md"} max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card border border-border/70 shadow-2xl rounded-2xl px-6 py-7 sm:px-8 sm:py-8 ${showTerms ? "" : "text-center"}`}
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
@@ -99,7 +156,7 @@ export function AgeGate() {
                 Terms of Use
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="sr-only">
-                Terms and conditions for using the VAULT recording archive.
+                Terms and conditions for using the Chuglii recording archive.
               </DialogPrimitive.Description>
               <div className="text-sm text-muted-foreground leading-relaxed space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 <p>
@@ -107,9 +164,9 @@ export function AgeGate() {
                   agree with any part of these terms, you must not use this site.
                 </p>
                 <p>
-                  <strong>Age Restriction.</strong> This site contains adult content intended for
-                  individuals who are 18 years of age or older (21 in some jurisdictions). By entering,
-                  you confirm that you meet the age requirement in your jurisdiction.
+                  <strong>Age Restriction.</strong> This site contains adult material intended only for
+                  people who are at least 18 years old or the age of majority in their location, whichever
+                  is higher. By entering, you confirm that you meet the applicable age requirement.
                 </p>
                 <p>
                   <strong>Personal Use.</strong> Content on this site is provided for personal,
@@ -127,8 +184,7 @@ export function AgeGate() {
                 </p>
                 <p>
                   <strong>Disclaimer.</strong> All content is provided "as is" without warranty of any
-                  kind. The site operators are not responsible for user-uploaded content or external
-                  links.
+                  kind. The site operators are not responsible for user-submitted content or external links.
                 </p>
                 <p>
                   <strong>Changes.</strong> These terms may be updated at any time. Continued use of the
@@ -147,29 +203,83 @@ export function AgeGate() {
             </>
           ) : (
             <>
-              <div className="mb-8">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold mb-4">
-                  <span>Age verification required</span>
+              <div className="flex flex-col items-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+                  <FilmStrip size={22} weight="duotone" className="text-primary" />
                 </div>
-                <DialogPrimitive.Title className="sr-only">
-                  Age Verification Required
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className="text-xl font-extrabold tracking-tight text-foreground">CHUGLII</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                </div>
+                <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                  The Cam Archive
+                </span>
+
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
+                  Adults only · 18+
+                </div>
+
+                <DialogPrimitive.Title className="mt-4 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                  Before you enter
                 </DialogPrimitive.Title>
-                <div className="text-5xl font-extrabold tracking-tight text-foreground mb-2">18+</div>
-                <div className="w-8 h-px bg-primary/60 mx-auto mb-4" />
-                <DialogPrimitive.Description className="text-sm text-muted-foreground leading-relaxed">
-                  This archive contains adult material. By entering, you confirm you are 18 years of age or
-                  older and agree to our{" "}
-                  <button
-                    type="button"
-                    onClick={() => setShowTerms(true)}
-                    className="text-primary hover:underline inline cursor-pointer bg-transparent border-none p-0 text-sm font-medium"
-                  >
-                    Terms of Use
-                  </button>
-                  .
+                <DialogPrimitive.Description className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  This archive contains adult material. To continue, you must be at least 18 years old
+                  or the legal age of majority where you live, whichever is higher.
                 </DialogPrimitive.Description>
               </div>
-              <div className="space-y-2.5">
+
+              <section
+                aria-label="Live archive statistics"
+                className="mt-6 rounded-xl border border-border/70 bg-secondary/25 p-4 text-left"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-50" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                    </span>
+                    Live archive data
+                  </div>
+                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{localTime}</span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-3">
+                    <div className="text-2xl sm:text-[1.7rem] font-extrabold tracking-tight tabular-nums text-foreground">
+                      {formattedCount(stats?.total_recordings)}
+                    </div>
+                    <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Recordings
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-3">
+                    <div className="text-2xl sm:text-[1.7rem] font-extrabold tracking-tight tabular-nums text-foreground">
+                      {formattedCount(stats?.total_performers)}
+                    </div>
+                    <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Performers
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border/50 pt-3 text-[10px] text-muted-foreground">
+                  <span>
+                    Latest recording:{" "}
+                    <span className="font-semibold text-foreground/80">
+                      {newestRecording ?? (statsQuery.isError ? "Unavailable" : "Loading…")}
+                    </span>
+                  </span>
+                  <span>
+                    {statsUpdatedAt ? `Stats updated ${statsUpdatedAt}` : "Connecting…"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[9px] text-muted-foreground/55">
+                  Archive totals refresh automatically. Time shown in your local timezone.
+                </p>
+              </section>
+
+              <div className="mt-5 space-y-2.5">
                 <button
                   type="button"
                   className="w-full h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold tracking-wide hover:bg-primary/90 transition-colors"
@@ -178,16 +288,28 @@ export function AgeGate() {
                     setIsOpen(false);
                   }}
                 >
-                  I am 18 or older — Enter
+                  Yes, I’m over 18 — Enter
                 </button>
                 <button
                   type="button"
-                  className="w-full h-11 px-4 rounded-xl border border-border/80 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-                  onClick={() => (window.location.href = "https://google.com")}
+                  className="w-full h-10 px-4 rounded-xl border border-border/80 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                  onClick={() => window.location.replace("https://www.google.com/")}
                 >
-                  Exit
+                  No, I’m under 18 — Leave
                 </button>
               </div>
+
+              <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground/65">
+                By entering, you confirm your age and agree to our{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="text-primary hover:underline"
+                >
+                  Terms of Use
+                </button>
+                .
+              </p>
             </>
           )}
         </DialogPrimitive.Content>
