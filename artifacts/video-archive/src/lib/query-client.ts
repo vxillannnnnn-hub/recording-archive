@@ -45,6 +45,10 @@ const PUBLIC_QUERY_PREFIXES = new Set([
   "getSearch",
   "hotRecordings",
   "hotPerformers",
+  "public-playlists",
+  "public-playlist",
+  "public-playlist-items",
+  "/api/playlists",
 ]);
 
 function isPersistableKey(queryKey: readonly unknown[]): boolean {
