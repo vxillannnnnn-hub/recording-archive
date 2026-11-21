@@ -69,7 +69,7 @@ export function sanitizePersistedQueryData(
       const queryKey: unknown = JSON.parse(key);
       // React Query keys must be arrays. Valid JSON objects/scalars are still
       // malformed persisted keys and must not be restored into the live cache.
-      if (Array.isArray(queryKey) && !isSensitiveKey(queryKey)) safe[key] = entry;
+      if (Array.isArray(queryKey) && isPersistableKey(queryKey)) safe[key] = entry;
     } catch {
       // Ignore malformed persisted keys rather than restoring unknown data.
     }
