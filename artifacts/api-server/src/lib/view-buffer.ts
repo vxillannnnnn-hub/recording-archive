@@ -50,10 +50,14 @@ async function readPgViewers(id: string): Promise<number | null> {
       .select("viewers")
       .eq("id", id)
       .maybeSingle();
-    if (error || !data) return null;
-    return Number(data.viewers ?? 0);
+    // null means the row was confirmed missing; NaN marks a DB/network failure
+    // so callers never mistake a transient outage for a deleted recording.
+    if (error) return Number.NaN;
+    if (!data) return null;
+    const viewers = Number(data.viewers ?? 0);
+    return Number.isSafeInteger(viewers) && viewers >= 0 ? viewers : Number.NaN;
   } catch {
-    return null;
+    return Number.NaN;
   }
 }
 
@@ -134,7 +138,7 @@ export async function recordView(recordingId: string): Promise<number | null> {
       // Fail closed: if the anchor cannot be read from PG, use the existing
       // direct-PG route fallback rather than creating a zero anchor and losing
       // historical counts.
-      if (pgBase === null) return null;
+      if (pgBase === null || !Number.isSafeInteger(pgBase) || pgBase < 0) return null;
       const wonAnchor = await redis.setnx(baseKey, String(pgBase));
       if (Number(wonAnchor) === 1) {
         baseRaw = String(pgBase);
@@ -196,9 +200,15 @@ async function flushId(redis: RedisClient, recordingId: string): Promise<{
 
   const pg = await readPgViewers(recordingId);
   if (pg === null) {
-    // Recording no longer exists — drop the whole buffer.
+    // The row is confirmed missing — drop the orphaned buffer.
     await deleteBufferKeys(redis, recordingId);
     return { id: recordingId, applied: 0, casMiss: false, deleted: true };
+  }
+  if (!Number.isSafeInteger(pg) || pg < 0) {
+    // A database/network error is NOT evidence that the recording was deleted.
+    // Preserve its pending views so a later cron/admin flush can retry.
+    logger.warn({ recordingId }, "View buffer flush skipped: viewer count unavailable");
+    return { id: recordingId, applied: 0, casMiss: true, deleted: false };
   }
 
   // Resync the anchor if PG moved underneath us (direct legacy writes, bulk
