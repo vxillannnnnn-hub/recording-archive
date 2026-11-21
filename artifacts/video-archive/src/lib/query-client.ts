@@ -18,27 +18,39 @@ const PERSIST_KEY = "vault-rq-cache";
 const PERSIST_TTL = 2 * 60 * 60_000; // persist cache snapshot for 2h — instant restore on reloads
 
 /**
- * Query keys that must NEVER be persisted across reloads/sessions: they carry
- * authenticated or per-session data (bookmarks, history, notifications, watch
- * later, reactions/comments with the current viewer's state, premium status).
- * Persisting them would let the next visitor on a shared browser see the
- * previous user's private data.
+ * Only explicitly public catalogue queries may survive reloads in shared browser
+ * storage. A blacklist is unsafe: new authenticated query keys can be added
+ * without being excluded, causing private data to leak to the next account.
+ *
+ * Unknown query keys are deliberately not persisted. This narrow allowlist
+ * keeps public catalogue warm-cache while protecting account data by default.
  */
-const SENSITIVE_QUERY_PREFIXES = new Set([
-  "user",
-  "premium",
-  "my-requests",
-  "recommendations",
-  "reactions",
-  "comments",
+const PUBLIC_QUERY_PREFIXES = new Set([
+  "/api/recordings",
+  "/api/performers",
+  "/api/tags",
+  "/api/stats",
+  "/api/search",
+  "/api/hot/recordings",
+  "/api/hot/performers",
+  "listRecordings",
+  "getListRecordings",
+  "listPerformers",
+  "getListPerformers",
+  "listTags",
+  "getListTags",
+  "getStats",
+  "getGetStats",
+  "search",
+  "getSearch",
+  "hotRecordings",
+  "hotPerformers",
 ]);
 
-function isSensitiveKey(queryKey: readonly unknown[]): boolean {
-  if (queryKey.length === 0) return false;
+function isPersistableKey(queryKey: readonly unknown[]): boolean {
   const first = queryKey[0];
-  return typeof first === "string" && SENSITIVE_QUERY_PREFIXES.has(first);
+  return typeof first === "string" && PUBLIC_QUERY_PREFIXES.has(first);
 }
-
 /**
  * Filter persisted snapshots during restore as well as during writes. Older
  * app versions may have left authenticated query data in the shared snapshot.
@@ -96,7 +108,7 @@ export function persistQueryCache(queryClient: QueryClient) {
   for (const q of queries) {
     const state = q.state;
     if (state && state.data !== undefined && state.status === "success") {
-      if (isSensitiveKey(q.queryKey)) continue;
+      if (!isPersistableKey(q.queryKey)) continue;
       data[JSON.stringify(q.queryKey)] = {
         data: state.data,
         dataUpdatedAt: state.dataUpdatedAt,
@@ -109,10 +121,11 @@ export function persistQueryCache(queryClient: QueryClient) {
       timestamp: Date.now(),
       data,
     };
-    // Use the TTL cache (switches to IndexedDB if payload > ~100KB).
-    // Local-only: the snapshot contains authenticated, user-specific query
-    // data and must never be written to the shared, CDN-cached edge tier.
+    // Persist only explicitly public catalogue responses.
     cacheSetLocal(PERSIST_KEY, payload, PERSIST_TTL);
+  } else {
+    // Avoid leaving a previous visitor's cache behind if no public query is present.
+    void cacheDelete(PERSIST_KEY);
   }
 }
 
