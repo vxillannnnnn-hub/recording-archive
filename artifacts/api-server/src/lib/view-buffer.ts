@@ -232,7 +232,7 @@ async function flushId(redis: RedisClient, recordingId: string): Promise<{
     // Another flusher (or a legacy writer) moved PG between our read and write.
     // Keep the backlog for the next pass and re-anchor to the now-current value.
     const fresh = await readPgViewers(recordingId);
-    if (fresh !== null) await redis.set(baseKey, String(fresh));
+    if (fresh !== null && Number.isSafeInteger(fresh) && fresh >= 0) await redis.set(baseKey, String(fresh));
     return { id: recordingId, applied: 0, casMiss: true, deleted: false };
   }
 
