@@ -26,6 +26,7 @@ const PERSIST_TTL = 2 * 60 * 60_000; // persist cache snapshot for 2h — instan
  * keeps public catalogue warm-cache while protecting account data by default.
  */
 const PUBLIC_QUERY_PREFIXES = new Set([
+  "recordings",
   "/api/recordings",
   "/api/performers",
   "/api/tags",
