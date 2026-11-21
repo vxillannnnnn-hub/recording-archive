@@ -122,13 +122,34 @@ export async function recordView(recordingId: string): Promise<number | null> {
   const redis = client();
   if (!redis) return null;
 
-  const pendKey = `${PEND_KEY}${recordingId}`;
-  const baseKey = `${BASE_KEY}${recordingId}`;
+  const pendKey = PEND_KEY + recordingId;
+  const baseKey = BASE_KEY + recordingId;
 
   try {
-    // Anchor the buffer to the current PG value ONCE (SETNX). Concurrent first
-    // views race harmlessly: whoever wins set the same PG snapshot.
-    await redis.setnx(baseKey, String(await readPgViewers(recordingId) ?? 0));
+    // Avoid a Postgres read on every play. SETNX only helps if we do not
+    // eagerly evaluate the PG lookup when the anchor already exists.
+    let baseRaw = await redis.get(baseKey);
+    if (baseRaw === null) {
+      const pgBase = await readPgViewers(recordingId);
+      // Fail closed: if the anchor cannot be read from PG, use the existing
+      // direct-PG route fallback rather than creating a zero anchor and losing
+      // historical counts.
+      if (pgBase === null) return null;
+      const wonAnchor = await redis.setnx(baseKey, String(pgBase));
+      if (Number(wonAnchor) === 1) {
+        baseRaw = String(pgBase);
+      } else {
+        // Another request initialized the anchor first; read its canonical
+        // value rather than using our potentially older snapshot.
+        baseRaw = await redis.get(baseKey);
+      }
+    }
+
+    const base = baseRaw === null ? null : Number.parseInt(baseRaw, 10);
+    if (base === null || !Number.isSafeInteger(base) || base < 0) {
+      logger.warn({ recordingId }, "View buffer anchor invalid; falling back to direct write");
+      return null;
+    }
 
     const pending = await redis.incr(pendKey);
     await redis.zadd(CHANGED_SET, Date.now(), recordingId);
@@ -142,8 +163,6 @@ export async function recordView(recordingId: string): Promise<number | null> {
       queueFlushId(recordingId);
     }
 
-    const baseRaw = await redis.get(baseKey);
-    const base = baseRaw === null ? 0 : Number.parseInt(baseRaw, 10) || 0;
     return base + pending;
   } catch (err) {
     logger.error({ err, recordingId }, "View buffer record error");
