@@ -106,26 +106,22 @@ export default function Home() {
   return (
     <Layout>
       {/* Compact archive hero — inspired by StripHub's simple title-first layout */}
-      <section className="relative border-b border-border/50 px-4 sm:px-6 py-6 sm:py-7 overflow-hidden section-accent">
+      <section className="relative border-b border-border/50 px-4 sm:px-6 py-6 sm:py-7 overflow-hidden section-accent" style={{ fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif' }}>
         <div className="container mx-auto max-w-3xl text-center relative">
           <h1
-            className="text-[clamp(2.5rem,6vw,3.75rem)] font-extrabold tracking-[-0.055em] leading-none animate-fade-in-up"
+            className="text-5xl font-semibold tracking-normal leading-[1.2] animate-fade-in-up"
             style={{ animationDelay: "0ms" }}
           >
-            CHUGLII<span className="text-primary">.</span>
+            <span className="text-[#fc6087]">CHUG</span><span className="text-foreground">LII</span>
             <span className="sr-only"> — The Cam Archive</span>
           </h1>
 
-          <div
-            className="mt-2 flex items-center justify-center gap-3 animate-fade-in-up"
+          <p
+            className="mt-1 text-lg font-light tracking-widest text-muted-foreground animate-fade-in-up"
             style={{ animationDelay: "60ms" }}
           >
-            <span className="h-px w-8 sm:w-12 bg-border/70" aria-hidden="true" />
-            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.26em] font-semibold text-muted-foreground">
-              The Cam Archive
-            </p>
-            <span className="h-px w-8 sm:w-12 bg-border/70" aria-hidden="true" />
-          </div>
+            - The Cam Archive -
+          </p>
 
           <p
             className="mt-2 text-xs sm:text-sm text-muted-foreground/75 animate-fade-in-up"
