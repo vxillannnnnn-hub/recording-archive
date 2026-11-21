@@ -14,6 +14,7 @@ const pg = vi.hoisted(() => ({
   viewers: new Map<string, number>(),
   meta: new Map<string, any>(), // recordings_with_links shape
   blockCas: false,
+  failRead: false,
 }));
 
 vi.mock("../redis.js", () => ({
@@ -50,6 +51,7 @@ vi.mock("../supabase.js", () => {
     };
     const readSingle = () => {
       if (state.table === "recordings") {
+        if (pg.failRead) return { data: null, error: { message: "temporary read failure" } };
         const id = findEq(state.eqs, "id");
         if (!pg.viewers.has(id)) return { data: null, error: null };
         return { data: { viewers: pg.viewers.get(id) }, error: null };
@@ -105,6 +107,7 @@ beforeEach(() => {
   pg.viewers.clear();
   pg.meta.clear();
   pg.blockCas = false;
+  pg.failRead = false;
   vi.clearAllMocks();
   useRedis();
 });
@@ -118,6 +121,13 @@ describe("recordView", () => {
   it("returns null for the direct-PG fallback when Redis is down", async () => {
     vi.mocked(redis.getFeatureRedis).mockReturnValue(null);
     expect(await recordView("rec1")).toBeNull();
+  });
+
+  it("falls back safely when the initial Postgres anchor read fails", async () => {
+    pg.failRead = true;
+    expect(await recordView("rec1")).toBeNull();
+    expect(store.strings.has("views:base:v1:rec1")).toBe(false);
+    expect(store.strings.has("views:pend:v1:rec1")).toBe(false);
   });
 
   it("coalesces increments against the last-read PG value", async () => {
@@ -168,12 +178,25 @@ describe("flushPendingViews", () => {
     expect(invalidateTags).toHaveBeenCalled();
   });
 
-  it("skips recordings that no longer exist in PG", async () => {
-    await recordView("ghost"); // no pg entry → setnx anchors to 0
+  it("does not create a view buffer for recordings confirmed missing in PG", async () => {
+    expect(await recordView("ghost")).toBeNull();
     const result = await flushPendingViews();
-    expect(result.deleted).toBe(1);
-    expect(result.applied).toBe(0);
+    expect(result.deleted).toBe(0);
+    expect(result.scanned).toBe(0);
     expect(pg.viewers.has("ghost")).toBe(false);
+  });
+
+  it("preserves buffered views when the flush read fails temporarily", async () => {
+    pg.viewers.set("a", 10);
+    await recordView("a");
+    await recordView("a");
+    pg.failRead = true;
+    const result = await flushPendingViews();
+    expect(result.applied).toBe(0);
+    expect(result.deleted).toBe(0);
+    expect(result.casMisses).toBe(1);
+    expect(store.strings.get("views:pend:v1:a")).toBe("2");
+    expect(store.zsets.get("views:changed:v1")?.size).toBe(1);
   });
 
   it("re-anchors and retries later when the CAS misses (concurrent writer)", async () => {
