@@ -342,9 +342,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     showAds && hasCreative(["leaderboard-728x90", "banner-468x60", "rect-300x100"]);
 
   return (
-    <div className="min-h-screen text-foreground flex flex-col font-sans relative isolate">
-      {/* Site-wide diamond lattice background pattern */}
-      <div className="pattern-square fixed inset-0 pointer-events-none opacity-20 -z-10" aria-hidden="true" />
+    <div className="min-h-screen text-foreground flex flex-col font-sans relative">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:shadow-lg focus:text-xs focus:font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
