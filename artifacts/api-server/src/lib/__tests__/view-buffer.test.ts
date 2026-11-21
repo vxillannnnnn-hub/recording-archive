@@ -51,8 +51,8 @@ vi.mock("../supabase.js", () => {
       updateObj: null as any,
     };
     const readSingle = () => {
-      pg.readCount += 1;
       if (state.table === "recordings") {
+        pg.readCount += 1;
         if (pg.failRead) return { data: null, error: { message: "temporary read failure" } };
         const id = findEq(state.eqs, "id");
         if (!pg.viewers.has(id)) return { data: null, error: null };
